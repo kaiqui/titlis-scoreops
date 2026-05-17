@@ -31,14 +31,7 @@ func NewTitlisAPINotifier(baseURL, internalSecret string) *TitlisAPINotifier {
 func (n *TitlisAPINotifier) SendScorecardEvaluated(ctx context.Context, result scoring.ScoreResult) {
 	payload := buildScorecardEvaluatedPayload(result)
 
-	envelope := map[string]any{
-		"v":    1,
-		"t":    "scorecard_evaluated",
-		"ts":   result.CalculatedAt.UnixMilli(),
-		"data": payload,
-	}
-
-	body, err := json.Marshal(envelope)
+	body, err := json.Marshal(payload)
 	if err != nil {
 		slog.Error("notifier: marshal envelope", "err", err, "uid", result.WorkloadUID)
 		return
