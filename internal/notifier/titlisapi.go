@@ -13,16 +13,16 @@ import (
 )
 
 type TitlisAPINotifier struct {
-	baseURL string
-	apiKey  string
-	client  *http.Client
+	baseURL        string
+	internalSecret string
+	client         *http.Client
 }
 
-func NewTitlisAPINotifier(baseURL, apiKey string) *TitlisAPINotifier {
+func NewTitlisAPINotifier(baseURL, internalSecret string) *TitlisAPINotifier {
 	return &TitlisAPINotifier{
-		baseURL: strings.TrimRight(baseURL, "/"),
-		apiKey:  apiKey,
-		client:  &http.Client{Timeout: 10 * time.Second},
+		baseURL:        strings.TrimRight(baseURL, "/"),
+		internalSecret: internalSecret,
+		client:         &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
@@ -32,11 +32,10 @@ func (n *TitlisAPINotifier) SendScorecardEvaluated(ctx context.Context, result s
 	payload := buildScorecardEvaluatedPayload(result)
 
 	envelope := map[string]any{
-		"v":       1,
-		"t":       "scorecard_evaluated",
-		"ts":      result.CalculatedAt.UnixMilli(),
-		"api_key": n.apiKey,
-		"data":    payload,
+		"v":    1,
+		"t":    "scorecard_evaluated",
+		"ts":   result.CalculatedAt.UnixMilli(),
+		"data": payload,
 	}
 
 	body, err := json.Marshal(envelope)
@@ -46,13 +45,13 @@ func (n *TitlisAPINotifier) SendScorecardEvaluated(ctx context.Context, result s
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		n.baseURL+"/v1/operator/events", bytes.NewReader(body))
+		n.baseURL+"/v1/internal/scoreops/scorecard-evaluated", bytes.NewReader(body))
 	if err != nil {
 		slog.Error("notifier: build request", "err", err, "uid", result.WorkloadUID)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Api-Key", n.apiKey)
+	req.Header.Set("X-Internal-Secret", n.internalSecret)
 
 	resp, err := n.client.Do(req)
 	if err != nil {
