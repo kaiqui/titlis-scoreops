@@ -47,10 +47,15 @@ type WorkloadSnapshot struct {
 	HasHPA                       bool `json:"has_hpa"`
 	HPAHasMetrics                bool `json:"hpa_has_metrics"`
 	HPAMinReplicas               int  `json:"hpa_min_replicas"`
+	HPAMaxReplicas               int  `json:"hpa_max_replicas"`
 	HPACPUTargetPercent          int  `json:"hpa_cpu_target_percent"`  // 0 = not set
 	HPAScaleUpStabilizationSec   int  `json:"hpa_scale_up_stabilization_sec"`   // -1 = not configured
 	HPAScaleDownStabilizationSec int  `json:"hpa_scale_down_stabilization_sec"` // -1 = not configured
 	HPAHasBehaviorPolicies       bool `json:"hpa_has_behavior_policies"`
+
+	// External context (injected by titlis-api from cluster metadata — additive fields)
+	HasDatadog  bool   `json:"has_datadog,omitempty"`
+	Environment string `json:"environment,omitempty"` // dev | hml | prd | unknown
 }
 
 func (s *WorkloadSnapshot) FromJSON(data []byte) error {
