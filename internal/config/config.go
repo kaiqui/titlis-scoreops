@@ -5,6 +5,7 @@ import "github.com/kelseyhightower/envconfig"
 type Settings struct {
 	Port             int    `envconfig:"SCOREOPS_PORT" default:"8090"`
 	DatabaseURL      string `envconfig:"SCOREOPS_DATABASE_URL" required:"true"`
+	DBPoolMax        int32  `envconfig:"SCOREOPS_DB_POOL_MAX" default:"4"`
 	InternalSecret   string `envconfig:"SCOREOPS_INTERNAL_SECRET" required:"true"`
 	PillarMinWeight  int    `envconfig:"SCOREOPS_PILLAR_MIN_WEIGHT" default:"5"`
 	PillarMaxWeight  int    `envconfig:"SCOREOPS_PILLAR_MAX_WEIGHT" default:"60"`
