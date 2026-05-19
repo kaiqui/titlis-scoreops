@@ -50,15 +50,29 @@ func NewHTTPClient(baseURL, secret string) *HTTPClient {
 	}
 }
 
+func normalizeEnvironment(env string) string {
+	switch env {
+	case "dev", "hml", "prd":
+		return env
+	default:
+		return "prd"
+	}
+}
+
+func normalizeCriticality(crit string) string {
+	switch crit {
+	case "low", "medium", "high", "critical":
+		return crit
+	case "standard", "":
+		return "medium"
+	default:
+		return "medium"
+	}
+}
+
 func (c *HTTPClient) GetHpaRecommendation(ctx context.Context, req RecommendationRequest) (HpaRecommendation, error) {
-	env := req.Environment
-	if env == "" {
-		env = "unknown"
-	}
-	crit := req.Criticality
-	if crit == "" {
-		crit = "standard"
-	}
+	env := normalizeEnvironment(req.Environment)
+	crit := normalizeCriticality(req.Criticality)
 	u := fmt.Sprintf("%s/v1/recommendations/hpa?tenant_id=%d&workload_uid=%s&environment=%s&criticality=%s",
 		c.baseURL, req.TenantID,
 		url.QueryEscape(req.WorkloadUID),
