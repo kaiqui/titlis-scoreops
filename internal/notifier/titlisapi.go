@@ -71,6 +71,8 @@ func pillarForRule(ruleID string) string {
 		return "performance"
 	case strings.HasPrefix(ruleID, "OPS"):
 		return "operational"
+	case strings.HasPrefix(ruleID, "OBS"):
+		return "observability"
 	default:
 		return "unknown"
 	}

@@ -5,10 +5,11 @@ import "time"
 const complianceThreshold = 80.0
 
 var defaultPillarWeights = map[string]float64{
-	"resilience":  40,
-	"security":    30,
-	"performance": 20,
-	"operational": 10,
+	"resilience":    40,
+	"security":      30,
+	"performance":   20,
+	"operational":   10,
+	"observability": 8,
 }
 
 // PillarModule is the evaluation contract for a scoring pillar.
@@ -71,6 +72,11 @@ func (e *ScoreEngine) Evaluate(
 		}
 
 		results := p.Evaluate(snap, active)
+		// Skip pillars with no evaluable rules (e.g. observability when has_datadog=false).
+		// This prevents empty pillars from diluting the overall score.
+		if len(results) == 0 {
+			continue
+		}
 
 		pillarWeight := weights[slug]
 		if pillarWeight == 0 {

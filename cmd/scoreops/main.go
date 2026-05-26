@@ -17,7 +17,6 @@ import (
 	"github.com/titlis/scoreops/internal/config"
 	"github.com/titlis/scoreops/internal/db"
 	"github.com/titlis/scoreops/internal/handler"
-	"github.com/titlis/scoreops/internal/insights"
 	"github.com/titlis/scoreops/internal/middleware"
 	"github.com/titlis/scoreops/internal/notifier"
 	"github.com/titlis/scoreops/internal/pillar"
@@ -55,22 +54,13 @@ func main() {
 	}
 	slog.Info("migrations applied")
 
-	// insights client for PERF-004
-	var insightsClient insights.Client
-	if cfg.InsightsURL != "" {
-		insightsClient = insights.NewHTTPClient(cfg.InsightsURL, cfg.InsightsSecret)
-		slog.Info("insights client configured", "url", cfg.InsightsURL)
-	} else {
-		insightsClient = insights.NoopClient{}
-		slog.Info("insights client disabled — SCOREOPS_INSIGHTS_URL not set")
-	}
-
 	// scoring engine
 	engine := scoring.NewScoreEngine()
 	engine.RegisterPillar(pillar.NewResiliencePillar())
 	engine.RegisterPillar(pillar.NewSecurityPillar())
-	engine.RegisterPillar(pillar.NewPerformancePillar(insightsClient))
+	engine.RegisterPillar(pillar.NewPerformancePillar())
 	engine.RegisterPillar(pillar.NewOperationalPillar())
+	engine.RegisterPillar(pillar.NewObservabilityPillar())
 
 	resolver := scoring.NewContextResolver(pool, engine.Pillars())
 

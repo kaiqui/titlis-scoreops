@@ -11,10 +11,11 @@ import (
 )
 
 const (
-	defaultResilienceWeight  = 40.0
-	defaultSecurityWeight    = 30.0
-	defaultPerformanceWeight = 20.0
-	defaultOperationalWeight = 10.0
+	defaultResilienceWeight    = 40.0
+	defaultSecurityWeight      = 30.0
+	defaultPerformanceWeight   = 20.0
+	defaultOperationalWeight   = 10.0
+	defaultObservabilityWeight = 8.0
 )
 
 // ContextResolver resolves which rules are active for a given workload and what pillar weights to use.
@@ -234,9 +235,10 @@ func scanStrings(rows pgx.Rows) ([]string, error) {
 
 func defaultWeights() map[string]float64 {
 	return map[string]float64{
-		"resilience":  defaultResilienceWeight,
-		"security":    defaultSecurityWeight,
-		"performance": defaultPerformanceWeight,
-		"operational": defaultOperationalWeight,
+		"resilience":    defaultResilienceWeight,
+		"security":      defaultSecurityWeight,
+		"performance":   defaultPerformanceWeight,
+		"operational":   defaultOperationalWeight,
+		"observability": defaultObservabilityWeight,
 	}
 }

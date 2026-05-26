@@ -11,9 +11,6 @@ type Settings struct {
 	PillarMaxWeight  int    `envconfig:"SCOREOPS_PILLAR_MAX_WEIGHT" default:"60"`
 	LogLevel         string `envconfig:"SCOREOPS_LOG_LEVEL" default:"info"`
 	TitlisAPIURL string `envconfig:"SCOREOPS_TITLISAPI_URL"`
-
-	InsightsURL    string `envconfig:"SCOREOPS_INSIGHTS_URL"`
-	InsightsSecret string `envconfig:"SCOREOPS_INSIGHTS_SECRET"`
 }
 
 func Load() (*Settings, error) {

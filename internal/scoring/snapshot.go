@@ -56,6 +56,10 @@ type WorkloadSnapshot struct {
 	// External context (injected by titlis-api from cluster metadata — additive fields)
 	HasDatadog  bool   `json:"has_datadog,omitempty"`
 	Environment string `json:"environment,omitempty"` // dev | hml | prd | unknown
+
+	// SLO presence (injected by titlis-api from slo_configs table before forwarding to scoreops)
+	HasSLO     bool `json:"has_slo,omitempty"`
+	SLOHealthy bool `json:"slo_healthy,omitempty"`
 }
 
 func (s *WorkloadSnapshot) FromJSON(data []byte) error {
