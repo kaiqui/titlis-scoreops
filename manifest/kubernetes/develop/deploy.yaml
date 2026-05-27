@@ -35,6 +35,8 @@ spec:
     metadata:
       labels:
         app: titlis-scoreops
+        titlis.io/github-owner: kaiqui
+        titlis.io/repo: titlis-scoreops
         tags.datadoghq.com/env: "preprod"
         tags.datadoghq.com/service: "titlis-scoreops"
         tags.datadoghq.com/version: "__IMAGE_TAG__"
