@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 
@@ -46,14 +47,37 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			continue
 		}
 
+		version := strings.TrimSuffix(entry.Name(), ".sql")
+
+		var already bool
+		err := pool.QueryRow(ctx,
+			`SELECT EXISTS(SELECT 1 FROM titlis_config.schema_migrations WHERE version = $1)`,
+			version,
+		).Scan(&already)
+		if err != nil {
+			return fmt.Errorf("check migration %s: %w", version, err)
+		}
+		if already {
+			slog.Debug("migration already applied, skipping", "version", version)
+			continue
+		}
+
 		sql, err := migrationsFS.ReadFile("migrations/" + entry.Name())
 		if err != nil {
 			return fmt.Errorf("read %s: %w", entry.Name(), err)
 		}
 
 		if _, err := pool.Exec(ctx, string(sql)); err != nil {
-			return fmt.Errorf("apply %s: %w", entry.Name(), err)
+			return fmt.Errorf("apply %s: %w", version, err)
 		}
+
+		if _, err := pool.Exec(ctx,
+			`INSERT INTO titlis_config.schema_migrations (version) VALUES ($1)`,
+			version,
+		); err != nil {
+			return fmt.Errorf("record migration %s: %w", version, err)
+		}
+		slog.Info("migration applied", "version", version)
 	}
 	return nil
 }
