@@ -48,11 +48,15 @@ func main() {
 	}
 	defer pool.Close()
 
-	if err := db.Migrate(ctx, pool); err != nil {
-		slog.Error("migration failed", "err", err)
-		os.Exit(1)
+	if cfg.SkipMigrations {
+		slog.Info("migrations skipped (SCOREOPS_SKIP_MIGRATIONS=true)")
+	} else {
+		if err := db.Migrate(ctx, pool); err != nil {
+			slog.Error("migration failed", "err", err)
+			os.Exit(1)
+		}
+		slog.Info("migrations applied")
 	}
-	slog.Info("migrations applied")
 
 	// scoring engine
 	engine := scoring.NewScoreEngine()

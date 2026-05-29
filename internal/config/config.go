@@ -10,7 +10,8 @@ type Settings struct {
 	PillarMinWeight  int    `envconfig:"SCOREOPS_PILLAR_MIN_WEIGHT" default:"5"`
 	PillarMaxWeight  int    `envconfig:"SCOREOPS_PILLAR_MAX_WEIGHT" default:"60"`
 	LogLevel         string `envconfig:"SCOREOPS_LOG_LEVEL" default:"info"`
-	TitlisAPIURL string `envconfig:"SCOREOPS_TITLISAPI_URL"`
+	TitlisAPIURL     string `envconfig:"SCOREOPS_TITLISAPI_URL"`
+	SkipMigrations   bool   `envconfig:"SCOREOPS_SKIP_MIGRATIONS" default:"false"`
 }
 
 func Load() (*Settings, error) {
