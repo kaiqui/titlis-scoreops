@@ -33,6 +33,26 @@ func Connect(ctx context.Context, databaseURL string, maxConns int32) (*pgxpool.
 }
 
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
+	// Bootstrap: cria schema e tabela de tracking na primeira execução.
+	// Requer DDL apenas uma vez; nas reinicializações seguintes é no-op.
+	_, bootstrapErr := pool.Exec(ctx, `
+		CREATE SCHEMA IF NOT EXISTS titlis_config;
+		CREATE TABLE IF NOT EXISTS titlis_config.schema_migrations (
+			version    VARCHAR(64) PRIMARY KEY,
+			applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+	`)
+	if bootstrapErr != nil {
+		// Usuário sem DDL: verifica se a tabela já existe antes de desistir.
+		var n int
+		if err := pool.QueryRow(ctx,
+			`SELECT COUNT(*) FROM titlis_config.schema_migrations`,
+		).Scan(&n); err != nil {
+			return fmt.Errorf("schema_migrations inacessível (inicialize o schema com um usuário privilegiado): %w", bootstrapErr)
+		}
+		slog.Debug("schema_migrations já existe, bootstrap ignorado", "motivo", bootstrapErr)
+	}
+
 	entries, err := migrationsFS.ReadDir("migrations")
 	if err != nil {
 		return fmt.Errorf("read migrations dir: %w", err)
