@@ -50,26 +50,25 @@ func checkSEC002(snap scoring.WorkloadSnapshot) scoring.RuleResult {
 	passed := snap.ReadOnlyRootFS
 	msg := "✅ ReadOnlyRootFilesystem habilitado"
 	if !passed {
-		msg = "❌ ReadOnlyRootFilesystem não habilitado"
+		msg = "❌ ReadOnlyRootFilesystem não habilitado — adicione securityContext.readOnlyRootFilesystem: true"
 	}
-	return ruleResult("SEC-002", "Read-Only Root Filesystem", "warning", 6.0, false, passed, msg, "")
+	return ruleResult("SEC-002", "Read-Only Root Filesystem", "warning", 6.0, true, passed, msg, "")
 }
 
 func checkSEC003(snap scoring.WorkloadSnapshot) scoring.RuleResult {
-	// AllowPrivilegeEscalation should be explicitly false
 	passed := !snap.AllowPrivilegeEscalation
 	msg := "✅ AllowPrivilegeEscalation desabilitado"
 	if !passed {
-		msg = "❌ AllowPrivilegeEscalation não está explicitamente desabilitado"
+		msg = "❌ AllowPrivilegeEscalation habilitado — adicione securityContext.allowPrivilegeEscalation: false"
 	}
-	return ruleResult("SEC-003", "No Privilege Escalation", "error", 8.0, false, passed, msg, "")
+	return ruleResult("SEC-003", "No Privilege Escalation", "error", 8.0, true, passed, msg, "")
 }
 
 func checkSEC004(snap scoring.WorkloadSnapshot) scoring.RuleResult {
 	passed := snap.HasDropCapabilities
 	msg := "✅ Capabilities dropped configurados"
 	if !passed {
-		msg = "❌ Nenhuma capability foi dropped"
+		msg = "❌ Nenhuma capability foi dropped — adicione securityContext.capabilities.drop: [\"ALL\"]"
 	}
-	return ruleResult("SEC-004", "Drop Capabilities", "warning", 5.0, false, passed, msg, "")
+	return ruleResult("SEC-004", "Drop Capabilities", "warning", 5.0, true, passed, msg, "")
 }
