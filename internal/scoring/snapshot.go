@@ -60,6 +60,11 @@ type WorkloadSnapshot struct {
 	// SLO presence (injected by titlis-api from slo_configs table before forwarding to scoreops)
 	HasSLO     bool `json:"has_slo,omitempty"`
 	SLOHealthy bool `json:"slo_healthy,omitempty"`
+
+	// BackstageComponent is the entity name registered in the Backstage catalog.
+	// Extracted by the operator from the Deployment annotation "backstage.io/kubernetes-id".
+	// Empty string means the workload is not registered in Backstage.
+	BackstageComponent string `json:"backstage_component,omitempty"`
 }
 
 func (s *WorkloadSnapshot) FromJSON(data []byte) error {

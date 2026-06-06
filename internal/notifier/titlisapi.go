@@ -109,7 +109,7 @@ func buildScorecardEvaluatedPayload(r scoring.ScoreResult) map[string]any {
 		validationResults = append(validationResults, vr)
 	}
 
-	return map[string]any{
+	payload := map[string]any{
 		"workload_id":        r.WorkloadUID,
 		"tenant_id":          r.TenantID,
 		"namespace":          r.Namespace,
@@ -131,6 +131,10 @@ func buildScorecardEvaluatedPayload(r scoring.ScoreResult) map[string]any {
 		"validation_results": validationResults,
 		"evaluated_at":       r.CalculatedAt.Format(time.RFC3339),
 	}
+	if r.BackstageComponent != "" {
+		payload["backstage_component"] = r.BackstageComponent
+	}
+	return payload
 }
 
 // Ensure TitlisAPINotifier satisfies the interface expected by handlers.

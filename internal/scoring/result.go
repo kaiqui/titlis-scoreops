@@ -37,7 +37,8 @@ type ScoreResult struct {
 	PassedChecks     int           `json:"passed_checks"`
 	TotalChecks      int           `json:"total_checks"`
 	RulesHash        string        `json:"rules_hash"`
-	PillarScores     []PillarScore `json:"pillar_scores"`
-	Findings         []RuleResult  `json:"findings"`
-	CalculatedAt     time.Time     `json:"calculated_at"`
+	PillarScores       []PillarScore `json:"pillar_scores"`
+	Findings           []RuleResult  `json:"findings"`
+	CalculatedAt       time.Time     `json:"calculated_at"`
+	BackstageComponent string        `json:"backstage_component,omitempty"`
 }

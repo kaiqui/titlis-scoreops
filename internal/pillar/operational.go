@@ -13,14 +13,27 @@ func NewOperationalPillar() *OperationalPillar { return &OperationalPillar{} }
 func (p *OperationalPillar) Slug() string { return "operational" }
 
 func (p *OperationalPillar) RuleIDs() []string {
-	return []string{"OPS-001"}
+	return []string{"OPS-001", "OPS-002"}
 }
 
 func (p *OperationalPillar) Evaluate(snap scoring.WorkloadSnapshot, active map[string]bool) []scoring.RuleResult {
+	var results []scoring.RuleResult
 	if active["OPS-001"] {
-		return []scoring.RuleResult{checkOPS001(snap)}
+		results = append(results, checkOPS001(snap))
 	}
-	return nil
+	if active["OPS-002"] {
+		results = append(results, checkOPS002(snap))
+	}
+	return results
+}
+
+func checkOPS002(snap scoring.WorkloadSnapshot) scoring.RuleResult {
+	passed := snap.BackstageComponent != ""
+	msg := "✅ Serviço registrado no catálogo do Backstage"
+	if !passed {
+		msg = "❌ Serviço não encontrado no catálogo do Backstage"
+	}
+	return ruleResult("OPS-002", "Backstage Registration", "error", 7.0, false, passed, msg, snap.BackstageComponent)
 }
 
 func checkOPS001(snap scoring.WorkloadSnapshot) scoring.RuleResult {

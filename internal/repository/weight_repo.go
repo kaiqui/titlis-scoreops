@@ -13,9 +13,9 @@ func NewWeightRepo(db *pgxpool.Pool) *WeightRepo { return &WeightRepo{db: db} }
 
 func (r *WeightRepo) Get(ctx context.Context, tenantID, engineID int) ([]domain.PillarWeight, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT tenant_id, engine_id, pillar, weight, updated_by
+		SELECT tenant_id, scoring_engine_id, pillar, weight, updated_by
 		FROM titlis_config.pillar_weights
-		WHERE tenant_id = $1 AND engine_id = $2
+		WHERE tenant_id = $1 AND scoring_engine_id = $2
 		ORDER BY pillar`,
 		tenantID, engineID)
 	if err != nil {
@@ -43,9 +43,9 @@ func (r *WeightRepo) Set(ctx context.Context, tenantID int, req domain.SetWeight
 
 	for pillar, weight := range req.Weights {
 		_, err := tx.Exec(ctx, `
-			INSERT INTO titlis_config.pillar_weights (tenant_id, engine_id, pillar, weight, updated_by)
+			INSERT INTO titlis_config.pillar_weights (tenant_id, scoring_engine_id, pillar, weight, updated_by)
 			VALUES ($1,$2,$3,$4,$5)
-			ON CONFLICT (tenant_id, engine_id, pillar)
+			ON CONFLICT (tenant_id, scoring_engine_id, pillar)
 			DO UPDATE SET weight = EXCLUDED.weight, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
 			tenantID, req.EngineID, pillar, weight, req.UpdatedBy)
 		if err != nil {

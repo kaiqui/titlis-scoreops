@@ -4,15 +4,15 @@
 -- As tags em si ficam em titlis_oltp.cluster_tags e namespace_tags (titlis-api).
 
 CREATE TABLE IF NOT EXISTS titlis_config.tag_rule_policies (
-    id          BIGSERIAL PRIMARY KEY,
-    tenant_id   INT          NOT NULL,
-    tag         VARCHAR(100) NOT NULL,
-    rule_id     VARCHAR(128),
-    severity    VARCHAR(32),
-    action      VARCHAR(32)  NOT NULL DEFAULT 'disable',
-    created_by  VARCHAR(256),
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    deleted_at  TIMESTAMPTZ,
+    tag_rule_policie_id BIGSERIAL PRIMARY KEY,
+    tenant_id           INT          NOT NULL,
+    tag                 VARCHAR(100) NOT NULL,
+    rule_id             VARCHAR(128),
+    severity            VARCHAR(32),
+    action              VARCHAR(32)  NOT NULL DEFAULT 'disable',
+    created_by          VARCHAR(256),
+    created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    deleted_at          TIMESTAMPTZ,
     CONSTRAINT tag_rule_policies_rule_xor_severity CHECK (
         (rule_id IS NOT NULL AND severity IS NULL) OR
         (rule_id IS NULL     AND severity IS NOT NULL)

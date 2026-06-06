@@ -15,7 +15,7 @@ func NewTagPolicyRepo(db *pgxpool.Pool) *TagPolicyRepo { return &TagPolicyRepo{d
 
 func (r *TagPolicyRepo) List(ctx context.Context, tenantID int64) ([]domain.TagPolicy, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, tenant_id, tag, COALESCE(rule_id,''), COALESCE(severity,''),
+		SELECT tag_rule_policie_id, tenant_id, tag, COALESCE(rule_id,''), COALESCE(severity,''),
 		       action, COALESCE(created_by,''), created_at
 		FROM titlis_config.tag_rule_policies
 		WHERE tenant_id = $1 AND deleted_at IS NULL
@@ -48,7 +48,7 @@ func (r *TagPolicyRepo) Create(ctx context.Context, tenantID int64, createdBy st
 			(tenant_id, tag, rule_id, severity, action, created_by)
 		VALUES ($1, $2, NULLIF($3,''), NULLIF($4,''), $5, NULLIF($6,''))
 		ON CONFLICT DO NOTHING
-		RETURNING id, tenant_id, tag, COALESCE(rule_id,''), COALESCE(severity,''),
+		RETURNING tag_rule_policie_id, tenant_id, tag, COALESCE(rule_id,''), COALESCE(severity,''),
 		          action, COALESCE(created_by,''), created_at`,
 		tenantID, req.Tag, req.RuleID, req.Severity, action, createdBy).
 		Scan(&p.ID, &p.TenantID, &p.Tag, &p.RuleID, &p.Severity,
@@ -63,7 +63,7 @@ func (r *TagPolicyRepo) Delete(ctx context.Context, tenantID, id int64) error {
 	tag, err := r.db.Exec(ctx,
 		`UPDATE titlis_config.tag_rule_policies
 		 SET deleted_at = NOW()
-		 WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL`, id, tenantID)
+		 WHERE tag_rule_policie_id = $1 AND tenant_id = $2 AND deleted_at IS NULL`, id, tenantID)
 	if err != nil {
 		return err
 	}

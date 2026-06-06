@@ -181,18 +181,52 @@ Se `SCOREOPS_TITLISAPI_URL` não for definido, o serviço funciona em modo stand
 
 ## 8. Banco de Dados
 
-O scoreops usa um schema próprio no PostgreSQL (`titlis_scoreops`).
-Migrations são aplicadas via `db.Migrate()` no startup (Go embeds SQL files).
+O scoreops usa um schema próprio no PostgreSQL (`titlis_config`).
+Migrations são aplicadas via `db.Migrate()` no startup (Go embeds SQL files em `internal/db/migrations/`).
 
 **Tabelas principais:**
-- `scoring_engines` — motores de scoring (ex: `k8s-default`)
-- `engine_rules` — regras por engine (pillar, severity, enabled_by_default)
-- `rule_overrides` — desabilitações por `(tenant_id, rule_id, scope_type, scope_value)`
-- `pillar_weights_config` — pesos por `(tenant_id, engine_id, pillar)`
-- `workload_snapshots` — último estado extraído por `(tenant_id, k8s_uid)`
-- `workload_scores` — score atual por `(tenant_id, k8s_uid)` (upsert)
-- `score_history` — histórico append-only (trigger_type: `operator_push` | `config_change`)
-- `scoring_audit_log` — log de mudanças de config (overrides, weights, engines)
+- `scoring_engines` — motores de scoring (PK: `scoring_engine_id`)
+- `engine_rules` — regras por engine (PK: `engine_rule_id`, FK: `scoring_engine_id`)
+- `rule_overrides` — desabilitações por escopo (PK: `rule_override_id`, FK: `scoring_engine_id`)
+- `pillar_weights` — pesos por `(tenant_id, scoring_engine_id, pillar)`
+- `workload_snapshots` — último estado extraído (PK: `workload_snapshot_id`)
+- `workload_scores` — score atual por `(tenant_id, engine_slug, workload_uid)` (PK: `workload_score_id`)
+- `score_history` — histórico append-only (PK: `score_history_id`)
+- `config_audit_log` — log de mudanças de config (PK: `config_audit_log_id`)
+- `tag_rule_policies` — políticas por tag (PK: `tag_rule_policie_id`)
+
+### Convenção de nomenclatura de colunas (decisão do DBA — obrigatória)
+
+**PKs:** nunca use `id` genérico. O nome deve ser `<nome_da_tabela>_id`.
+```sql
+-- Correto
+CREATE TABLE titlis_config.minha_tabela (
+    minha_tabela_id SERIAL PRIMARY KEY,
+    ...
+);
+
+-- Errado — rejeitado em review
+CREATE TABLE titlis_config.minha_tabela (
+    id SERIAL PRIMARY KEY,  -- NÃO USE
+    ...
+);
+```
+
+**FKs:** o nome da coluna deve ser idêntico ao PK que ela referencia.
+```sql
+-- Correto: FK referencia scoring_engines.scoring_engine_id → coluna se chama scoring_engine_id
+minha_tabela_id INT NOT NULL REFERENCES titlis_config.scoring_engines(scoring_engine_id)
+
+-- Errado — rejeitado em review
+engine_id INT NOT NULL REFERENCES titlis_config.scoring_engines(scoring_engine_id)  -- NÃO USE
+```
+
+### Adicionando uma nova migration
+
+1. Cria `internal/db/migrations/<próximo_número>_<descricao>.sql`
+2. O bootstrap do `db.Migrate()` aplica automaticamente na ordem numérica
+3. Use `IF NOT EXISTS` / `ON CONFLICT` para manter idempotência
+4. Se a migration renomeia colunas em banco já existente, use blocos `DO $$ BEGIN ... END $$` para verificar antes de renomear (veja `000007_rename_pk_columns.sql` como referência)
 
 ---
 

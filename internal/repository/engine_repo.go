@@ -15,9 +15,9 @@ func NewEngineRepo(db *pgxpool.Pool) *EngineRepo { return &EngineRepo{db: db} }
 
 func (r *EngineRepo) List(ctx context.Context) ([]domain.Engine, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, slug, name, COALESCE(description,''), enabled, created_at
+		SELECT scoring_engine_id, slug, name, COALESCE(description,''), enabled, created_at
 		FROM titlis_config.scoring_engines
-		ORDER BY id`)
+		ORDER BY scoring_engine_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func (r *EngineRepo) List(ctx context.Context) ([]domain.Engine, error) {
 func (r *EngineRepo) SlugForID(ctx context.Context, engineID int) (string, error) {
 	var slug string
 	err := r.db.QueryRow(ctx,
-		`SELECT slug FROM titlis_config.scoring_engines WHERE id = $1`, engineID).Scan(&slug)
+		`SELECT slug FROM titlis_config.scoring_engines WHERE scoring_engine_id = $1`, engineID).Scan(&slug)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", domain.ErrNotFound
 	}
@@ -47,7 +47,7 @@ func (r *EngineRepo) SlugForID(ctx context.Context, engineID int) (string, error
 func (r *EngineRepo) GetBySlug(ctx context.Context, slug string) (*domain.Engine, error) {
 	var e domain.Engine
 	err := r.db.QueryRow(ctx, `
-		SELECT id, slug, name, COALESCE(description,''), enabled, created_at
+		SELECT scoring_engine_id, slug, name, COALESCE(description,''), enabled, created_at
 		FROM titlis_config.scoring_engines WHERE slug = $1`, slug).
 		Scan(&e.ID, &e.Slug, &e.Name, &e.Description, &e.Enabled, &e.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -62,7 +62,7 @@ func (r *EngineRepo) Create(ctx context.Context, req domain.CreateEngineRequest)
 		INSERT INTO titlis_config.scoring_engines (slug, name, description)
 		VALUES ($1, $2, $3)
 		ON CONFLICT (slug) DO NOTHING
-		RETURNING id, slug, name, COALESCE(description,''), enabled, created_at`,
+		RETURNING scoring_engine_id, slug, name, COALESCE(description,''), enabled, created_at`,
 		req.Slug, req.Name, req.Description).
 		Scan(&e.ID, &e.Slug, &e.Name, &e.Description, &e.Enabled, &e.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -86,9 +86,9 @@ func (r *EngineRepo) SetEnabled(ctx context.Context, slug string, enabled bool) 
 
 func (r *EngineRepo) ListRules(ctx context.Context, engineID int) ([]domain.Rule, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, engine_id, rule_id, pillar, name, COALESCE(description,''), severity, enabled_by_default, created_at
+		SELECT engine_rule_id, scoring_engine_id, rule_id, pillar, name, COALESCE(description,''), severity, enabled_by_default, created_at
 		FROM titlis_config.engine_rules
-		WHERE engine_id = $1
+		WHERE scoring_engine_id = $1
 		ORDER BY pillar, rule_id`, engineID)
 	if err != nil {
 		return nil, err
@@ -120,10 +120,10 @@ func (r *EngineRepo) CreateRule(ctx context.Context, engineID int, req domain.Cr
 	var ru domain.Rule
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO titlis_config.engine_rules
-			(engine_id, rule_id, pillar, name, description, severity, enabled_by_default)
+			(scoring_engine_id, rule_id, pillar, name, description, severity, enabled_by_default)
 		VALUES ($1,$2,$3,$4,$5,$6,$7)
-		ON CONFLICT (engine_id, rule_id) DO NOTHING
-		RETURNING id, engine_id, rule_id, pillar, name, COALESCE(description,''), severity, enabled_by_default, created_at`,
+		ON CONFLICT (scoring_engine_id, rule_id) DO NOTHING
+		RETURNING engine_rule_id, scoring_engine_id, rule_id, pillar, name, COALESCE(description,''), severity, enabled_by_default, created_at`,
 		engineID, req.RuleID, req.Pillar, req.Name, req.Description, severity, enabledByDefault).
 		Scan(&ru.ID, &ru.EngineID, &ru.RuleID, &ru.Pillar, &ru.Name,
 			&ru.Description, &ru.Severity, &ru.EnabledByDefault, &ru.CreatedAt)

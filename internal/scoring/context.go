@@ -90,14 +90,14 @@ func (r *ContextResolver) ResolveWeights(
 ) (map[string]float64, error) {
 	var engineID int
 	err := r.db.QueryRow(ctx,
-		`SELECT id FROM titlis_config.scoring_engines WHERE slug = $1`, engineSlug).
+		`SELECT scoring_engine_id FROM titlis_config.scoring_engines WHERE slug = $1`, engineSlug).
 		Scan(&engineID)
 	if err != nil {
 		return defaultWeights(), nil
 	}
 
 	rows, err := r.db.Query(ctx,
-		`SELECT pillar, weight FROM titlis_config.pillar_weights WHERE tenant_id = $1 AND engine_id = $2`,
+		`SELECT pillar, weight FROM titlis_config.pillar_weights WHERE tenant_id = $1 AND scoring_engine_id = $2`,
 		tenantID, engineID)
 	if err != nil {
 		return defaultWeights(), nil
@@ -128,7 +128,7 @@ func (r *ContextResolver) queryClusterDisabled(
 	rows, err := r.db.Query(ctx, `
 		SELECT o.rule_id
 		FROM titlis_config.rule_overrides o
-		JOIN titlis_config.scoring_engines e ON e.id = o.engine_id
+		JOIN titlis_config.scoring_engines e ON e.scoring_engine_id = o.scoring_engine_id
 		WHERE o.tenant_id = $1
 		  AND e.slug = $2
 		  AND o.enabled = FALSE
@@ -155,7 +155,7 @@ func (r *ContextResolver) queryWorkloadDisabled(
 	rows, err := r.db.Query(ctx, `
 		SELECT o.rule_id
 		FROM titlis_config.rule_overrides o
-		JOIN titlis_config.scoring_engines e ON e.id = o.engine_id
+		JOIN titlis_config.scoring_engines e ON e.scoring_engine_id = o.scoring_engine_id
 		WHERE o.tenant_id = $1
 		  AND e.slug = $2
 		  AND o.enabled = FALSE
@@ -187,7 +187,7 @@ func (r *ContextResolver) queryTagDisabled(
 		SELECT DISTINCT er.rule_id
 		FROM titlis_config.tag_rule_policies trp
 		JOIN titlis_config.engine_rules er ON er.severity = trp.severity
-		JOIN titlis_config.scoring_engines e ON e.id = er.engine_id AND e.slug = $3
+		JOIN titlis_config.scoring_engines e ON e.scoring_engine_id = er.scoring_engine_id AND e.slug = $3
 		WHERE trp.tenant_id = $1
 		  AND trp.tag = ANY($2)
 		  AND trp.severity IS NOT NULL

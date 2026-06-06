@@ -16,11 +16,11 @@ func NewOverrideRepo(db *pgxpool.Pool) *OverrideRepo { return &OverrideRepo{db: 
 
 func (r *OverrideRepo) List(ctx context.Context, tenantID int, engineSlug, scope, cluster string) ([]domain.Override, error) {
 	query := `
-		SELECT o.id, o.tenant_id, o.engine_id, o.rule_id, o.scope,
+		SELECT o.rule_override_id, o.tenant_id, o.scoring_engine_id, o.rule_id, o.scope,
 		       COALESCE(o.cluster_name,''), COALESCE(o.namespace,''), COALESCE(o.workload_uid,''),
 		       o.enabled, COALESCE(o.reason,''), o.created_by, o.created_at
 		FROM titlis_config.rule_overrides o
-		JOIN titlis_config.scoring_engines e ON e.id = o.engine_id
+		JOIN titlis_config.scoring_engines e ON e.scoring_engine_id = o.scoring_engine_id
 		WHERE o.tenant_id = $1 AND o.deleted_at IS NULL`
 
 	args := []any{tenantID}
@@ -67,13 +67,13 @@ func (r *OverrideRepo) Upsert(ctx context.Context, tenantID int, req domain.Crea
 	var o domain.Override
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO titlis_config.rule_overrides
-			(tenant_id, engine_id, rule_id, scope, cluster_name, namespace, workload_uid, enabled, reason, created_by)
+			(tenant_id, scoring_engine_id, rule_id, scope, cluster_name, namespace, workload_uid, enabled, reason, created_by)
 		VALUES ($1,$2,$3,$4::titlis_config.scope_type,$5,$6,$7,$8,$9,$10)
-		ON CONFLICT (tenant_id, engine_id, rule_id, scope,
+		ON CONFLICT (tenant_id, scoring_engine_id, rule_id, scope,
 		             COALESCE(cluster_name,''), COALESCE(namespace,''), COALESCE(workload_uid,''))
 		DO UPDATE SET enabled = EXCLUDED.enabled, reason = EXCLUDED.reason,
 		              created_by = EXCLUDED.created_by, created_at = NOW(), deleted_at = NULL
-		RETURNING id, tenant_id, engine_id, rule_id, scope,
+		RETURNING rule_override_id, tenant_id, scoring_engine_id, rule_id, scope,
 		          COALESCE(cluster_name,''), COALESCE(namespace,''), COALESCE(workload_uid,''),
 		          enabled, COALESCE(reason,''), created_by, created_at`,
 		tenantID, req.EngineID, req.RuleID, string(req.Scope),
@@ -88,11 +88,11 @@ func (r *OverrideRepo) Upsert(ctx context.Context, tenantID int, req domain.Crea
 func (r *OverrideRepo) GetByID(ctx context.Context, tenantID int, id int64) (*domain.Override, error) {
 	var o domain.Override
 	err := r.db.QueryRow(ctx, `
-		SELECT id, tenant_id, engine_id, rule_id, scope,
+		SELECT rule_override_id, tenant_id, scoring_engine_id, rule_id, scope,
 		       COALESCE(cluster_name,''), COALESCE(namespace,''), COALESCE(workload_uid,''),
 		       enabled, COALESCE(reason,''), created_by, created_at
 		FROM titlis_config.rule_overrides
-		WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL`, id, tenantID).
+		WHERE rule_override_id = $1 AND tenant_id = $2 AND deleted_at IS NULL`, id, tenantID).
 		Scan(&o.ID, &o.TenantID, &o.EngineID, &o.RuleID, &o.Scope,
 			&o.ClusterName, &o.Namespace, &o.WorkloadUID,
 			&o.Enabled, &o.Reason, &o.CreatedBy, &o.CreatedAt)
@@ -108,7 +108,7 @@ func (r *OverrideRepo) GetByID(ctx context.Context, tenantID int, id int64) (*do
 func (r *OverrideRepo) Delete(ctx context.Context, tenantID int, id int64) error {
 	tag, err := r.db.Exec(ctx,
 		`UPDATE titlis_config.rule_overrides SET deleted_at = NOW()
-		 WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL`, id, tenantID)
+		 WHERE rule_override_id = $1 AND tenant_id = $2 AND deleted_at IS NULL`, id, tenantID)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func (r *OverrideRepo) ResolveClusterDisabled(ctx context.Context, tenantID int,
 	rows, err := r.db.Query(ctx, `
 		SELECT o.rule_id
 		FROM titlis_config.rule_overrides o
-		JOIN titlis_config.scoring_engines e ON e.id = o.engine_id
+		JOIN titlis_config.scoring_engines e ON e.scoring_engine_id = o.scoring_engine_id
 		WHERE o.tenant_id = $1
 		  AND e.slug = $2
 		  AND o.enabled = FALSE
@@ -146,7 +146,7 @@ func (r *OverrideRepo) ResolveWorkloadDisabled(ctx context.Context, tenantID int
 	rows, err := r.db.Query(ctx, `
 		SELECT o.rule_id
 		FROM titlis_config.rule_overrides o
-		JOIN titlis_config.scoring_engines e ON e.id = o.engine_id
+		JOIN titlis_config.scoring_engines e ON e.scoring_engine_id = o.scoring_engine_id
 		WHERE o.tenant_id = $1
 		  AND e.slug = $2
 		  AND o.enabled = FALSE
@@ -173,7 +173,7 @@ func (r *OverrideRepo) Resolve(ctx context.Context, tenantID int, q domain.Resol
 	err := r.db.QueryRow(ctx, `
 		SELECT o.rule_id, o.enabled, o.scope
 		FROM titlis_config.rule_overrides o
-		JOIN titlis_config.scoring_engines e ON e.id = o.engine_id
+		JOIN titlis_config.scoring_engines e ON e.scoring_engine_id = o.scoring_engine_id
 		WHERE o.tenant_id = $1
 		  AND e.slug = $2
 		  AND o.rule_id = $3

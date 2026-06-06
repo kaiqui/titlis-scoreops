@@ -1,13 +1,13 @@
 -- Seed das 26 regras padrão do motor kubernetes.
--- Idempotente: ON CONFLICT (engine_id, rule_id) DO NOTHING.
+-- Idempotente: ON CONFLICT (scoring_engine_id, rule_id) DO NOTHING.
 -- Fonte: titlis-operator-go/src/internal/scorecard/rules.go defaultRules()
 
 WITH eng AS (
-    SELECT id FROM titlis_config.scoring_engines WHERE slug = 'kubernetes'
+    SELECT scoring_engine_id FROM titlis_config.scoring_engines WHERE slug = 'kubernetes'
 )
 INSERT INTO titlis_config.engine_rules
-    (engine_id, rule_id, pillar, name, severity, enabled_by_default)
-SELECT eng.id, r.rule_id, r.pillar, r.name, r.severity, TRUE
+    (scoring_engine_id, rule_id, pillar, name, severity, enabled_by_default)
+SELECT eng.scoring_engine_id, r.rule_id, r.pillar, r.name, r.severity, TRUE
 FROM eng, (VALUES
     -- Resilience
     ('RES-001', 'resilience', 'Liveness Probe',               'error'),
@@ -40,4 +40,4 @@ FROM eng, (VALUES
     -- Operational
     ('OPS-001', 'operational', 'Datadog Labels',              'warning')
 ) AS r(rule_id, pillar, name, severity)
-ON CONFLICT (engine_id, rule_id) DO NOTHING;
+ON CONFLICT (scoring_engine_id, rule_id) DO NOTHING;

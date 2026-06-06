@@ -51,16 +51,16 @@ func (r *AuditRepo) List(ctx context.Context, tenantID, limit int, before int64)
 	var err error
 
 	query := `
-		SELECT id, tenant_id, actor, action, entity_type, entity_id,
+		SELECT config_audit_log_id, tenant_id, actor, action, entity_type, entity_id,
 		       before_json, after_json, created_at
 		FROM titlis_config.config_audit_log
 		WHERE tenant_id = $1`
 
 	if before > 0 {
-		query += ` AND id < $3 ORDER BY created_at DESC, id DESC LIMIT $2`
+		query += ` AND config_audit_log_id < $3 ORDER BY created_at DESC, config_audit_log_id DESC LIMIT $2`
 		rows, err = r.db.Query(ctx, query, tenantID, limit, before)
 	} else {
-		query += ` ORDER BY created_at DESC, id DESC LIMIT $2`
+		query += ` ORDER BY created_at DESC, config_audit_log_id DESC LIMIT $2`
 		rows, err = r.db.Query(ctx, query, tenantID, limit)
 	}
 	if err != nil {
