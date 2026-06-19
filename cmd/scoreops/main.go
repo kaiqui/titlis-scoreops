@@ -58,7 +58,7 @@ func main() {
 		slog.Info("migrations applied")
 	}
 
-	// scoring engine
+	// workload scoring engine
 	engine := scoring.NewScoreEngine()
 	engine.RegisterPillar(pillar.NewResiliencePillar())
 	engine.RegisterPillar(pillar.NewSecurityPillar())
@@ -66,23 +66,37 @@ func main() {
 	engine.RegisterPillar(pillar.NewOperationalPillar())
 	engine.RegisterPillar(pillar.NewObservabilityPillar())
 
+	// queue scoring engine
+	queueEngine := scoring.NewQueueScoreEngine()
+	queueEngine.RegisterPillar(pillar.NewQueueResiliencePillar())
+	queueEngine.RegisterPillar(pillar.NewQueueSecurityPillar())
+	queueEngine.RegisterPillar(pillar.NewQueuePerformancePillar())
+	queueEngine.RegisterPillar(pillar.NewQueueOperationalPillar())
+	queueEngine.RegisterPillar(pillar.NewQueueObservabilityPillar())
+
 	resolver := scoring.NewContextResolver(pool, engine.Pillars())
 
 	// repositories
-	engineRepo   := repository.NewEngineRepo(pool)
-	overrideRepo := repository.NewOverrideRepo(pool)
-	weightRepo   := repository.NewWeightRepo(pool)
-	auditRepo    := repository.NewAuditRepo(pool)
-	snapshotRepo := repository.NewSnapshotRepo(pool)
-	scoreRepo    := repository.NewScoreRepo(pool)
+	engineRepo        := repository.NewEngineRepo(pool)
+	overrideRepo      := repository.NewOverrideRepo(pool)
+	weightRepo        := repository.NewWeightRepo(pool)
+	auditRepo         := repository.NewAuditRepo(pool)
+	snapshotRepo      := repository.NewSnapshotRepo(pool)
+	scoreRepo         := repository.NewScoreRepo(pool)
+	queueSnapshotRepo := repository.NewQueueSnapshotRepo(pool)
+	queueScoreRepo    := repository.NewQueueScoreRepo(pool)
 
 	// notifier
 	var scoreNotifier notifier.ScorecardNotifier
+	var queueNotifier notifier.QueueNotifier
 	if cfg.TitlisAPIURL != "" {
-		scoreNotifier = notifier.NewTitlisAPINotifier(cfg.TitlisAPIURL, cfg.InternalSecret)
+		n := notifier.NewTitlisAPINotifier(cfg.TitlisAPIURL, cfg.InternalSecret)
+		scoreNotifier = n
+		queueNotifier = n
 		slog.Info("notifier configured", "url", cfg.TitlisAPIURL)
 	} else {
 		scoreNotifier = notifier.NoopNotifier{}
+		queueNotifier = notifier.NoopNotifier{}
 		slog.Info("notifier disabled — SCOREOPS_TITLISAPI_URL not set")
 	}
 
@@ -98,7 +112,8 @@ func main() {
 	evaluateH := handler.NewEvaluateHandler(engine, resolver, snapshotRepo, scoreRepo, scoreNotifier)
 	scoresH := handler.NewScoresHandler(scoreRepo)
 	tagPolicyRepo := repository.NewTagPolicyRepo(pool)
-	tagPolicyH := handler.NewTagPolicyHandler(tagPolicyRepo)
+	tagPolicyH    := handler.NewTagPolicyHandler(tagPolicyRepo)
+	queueEvaluateH := handler.NewQueueEvaluateHandler(queueEngine, queueSnapshotRepo, queueScoreRepo, queueNotifier)
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID)
@@ -123,6 +138,7 @@ func main() {
 
 		// scoring
 		r.Post("/v1/scoring/evaluate", evaluateH.Evaluate)
+		r.Post("/v1/queue/evaluate", queueEvaluateH.Evaluate)
 
 		// engines
 		r.Get("/engines", engineH.List)

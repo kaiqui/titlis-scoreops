@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -137,9 +138,113 @@ func buildScorecardEvaluatedPayload(r scoring.ScoreResult) map[string]any {
 	return payload
 }
 
-// Ensure TitlisAPINotifier satisfies the interface expected by handlers.
+// SendQueueEvaluated posts a queue_evaluated event to titlis-api.
+// Fire-and-forget: call from a goroutine. Failures are logged but not propagated.
+func (n *TitlisAPINotifier) SendQueueEvaluated(ctx context.Context, result scoring.QueueScoreResult) {
+	payload := buildQueueEvaluatedPayload(result)
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		slog.Error("notifier: marshal queue envelope", "err", err, "external_id", result.ExternalID)
+		return
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		n.baseURL+"/v1/internal/scoreops/queue-evaluated", bytes.NewReader(body))
+	if err != nil {
+		slog.Error("notifier: build queue request", "err", err, "external_id", result.ExternalID)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-Secret", n.internalSecret)
+
+	resp, err := n.client.Do(req)
+	if err != nil {
+		slog.Warn("notifier: queue send failed", "err", err, "external_id", result.ExternalID)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		b, _ := io.ReadAll(resp.Body)
+		slog.Warn("notifier: queue unexpected status",
+			"status", resp.StatusCode,
+			"external_id", result.ExternalID,
+			"body", string(b),
+		)
+		return
+	}
+	slog.Info("notifier: queue_evaluated sent", "external_id", result.ExternalID, "score", result.OverallScore, "status", resp.StatusCode)
+}
+
+func buildQueueEvaluatedPayload(r scoring.QueueScoreResult) map[string]any {
+	pillarScores := make([]map[string]any, 0, len(r.PillarScores))
+	for _, ps := range r.PillarScores {
+		pillarScores = append(pillarScores, map[string]any{
+			"pillar":       ps.Pillar,
+			"pillarScore":  ps.Score,
+			"passedChecks": ps.PassedChecks,
+			"failedChecks": ps.TotalChecks - ps.PassedChecks,
+			"weightedScore": ps.WeightedScore,
+		})
+	}
+
+	validationResults := make([]map[string]any, 0, len(r.Findings))
+	for _, f := range r.Findings {
+		vr := map[string]any{
+			"ruleId":        f.RuleID,
+			"ruleName":      f.RuleName,
+			"pillar":        queuePillarForRule(f.RuleID),
+			"severity":      f.Severity,
+			"rulePassed":    f.Passed,
+			"resultMessage": f.Message,
+		}
+		if f.ActualValue != "" {
+			vr["actualValue"] = f.ActualValue
+		}
+		validationResults = append(validationResults, vr)
+	}
+
+	return map[string]any{
+		"provider":         r.Provider,
+		"externalId":       r.ExternalID,
+		"tenantId":         r.TenantID,
+		"overallScore":     r.OverallScore,
+		"complianceStatus": r.ComplianceStatus,
+		"totalRules":       r.TotalChecks,
+		"passedRules":      r.PassedChecks,
+		"failedRules":      r.TotalChecks - r.PassedChecks,
+		"criticalFailures": r.CriticalIssues,
+		"errorCount":       r.ErrorIssues,
+		"warningCount":     r.WarningIssues,
+		"pillarScores":     pillarScores,
+		"validationResults": validationResults,
+		"evaluatedAt":      r.CalculatedAt.Format(time.RFC3339),
+	}
+}
+
+func queuePillarForRule(ruleID string) string {
+	switch {
+	case len(ruleID) >= 2 && ruleID[:2] == "QR":
+		return "resilience"
+	case len(ruleID) >= 2 && ruleID[:2] == "QS":
+		return "security"
+	case len(ruleID) >= 2 && ruleID[:2] == "QP":
+		return "performance"
+	case len(ruleID) >= 2 && ruleID[:2] == "QO":
+		return "operational"
+	default:
+		return "observability"
+	}
+}
+
+// Ensure TitlisAPINotifier satisfies the interfaces expected by handlers.
 var _ interface {
 	SendScorecardEvaluated(ctx context.Context, result scoring.ScoreResult)
+} = (*TitlisAPINotifier)(nil)
+
+var _ interface {
+	SendQueueEvaluated(ctx context.Context, result scoring.QueueScoreResult)
 } = (*TitlisAPINotifier)(nil)
 
 // NoopNotifier is used when SCOREOPS_TITLISAPI_URL is not configured.
@@ -149,8 +254,17 @@ func (NoopNotifier) SendScorecardEvaluated(_ context.Context, result scoring.Sco
 	slog.Debug("notifier: noop — titlis-api URL not configured", "uid", result.WorkloadUID)
 }
 
+func (NoopNotifier) SendQueueEvaluated(_ context.Context, result scoring.QueueScoreResult) {
+	slog.Debug("notifier: noop queue — titlis-api URL not configured", "external_id", result.ExternalID)
+}
+
 // ScorecardNotifier is the interface consumed by handlers.
 type ScorecardNotifier interface {
 	SendScorecardEvaluated(ctx context.Context, result scoring.ScoreResult)
+}
+
+// QueueNotifier is the interface consumed by the queue evaluate handler.
+type QueueNotifier interface {
+	SendQueueEvaluated(ctx context.Context, result scoring.QueueScoreResult)
 }
 

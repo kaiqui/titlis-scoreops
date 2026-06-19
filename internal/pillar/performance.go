@@ -73,11 +73,11 @@ func checkPERF003(snap scoring.WorkloadSnapshot) scoring.RuleResult {
 			"❌ HPA sem target de CPU ou HPA ausente", "")
 	}
 	target := snap.HPACPUTargetPercent
-	passed := target <= 70
+	passed := target <= 90
 	actual := fmt.Sprintf("%d", target)
 	msg := fmt.Sprintf("✅ HPA CPU target: %d%%", target)
 	if !passed {
-		msg = fmt.Sprintf("❌ HPA CPU target muito alto: %d%% (máximo: 70%%)", target)
+		msg = fmt.Sprintf("❌ HPA CPU target muito alto: %d%% (máximo: 90%%)", target)
 	}
 	return ruleResult("PERF-003", "HPA CPU Target Ceiling", "info", 3.0, true, passed, msg, actual)
 }
