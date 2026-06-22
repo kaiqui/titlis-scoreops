@@ -19,9 +19,13 @@ Responsabilidades:
 - **Recalculação** — quando overrides ou pesos mudam, o `RecalcWorker` recalcula scores
   dos últimos snapshots afetados sem precisar de nova avaliação do operator
 - **API de configuração** — CRUD de engines, regras, overrides, pesos por tenant
+- **Coverage Engine** (Observability Intelligence Platform / D5) — gera o **scorecard personalizado por
+  serviço** a partir de um `CoverageSnapshot` montado pela titlis-api (do grafo de ativos). Findings são
+  **100% determinísticos/regras — sem IA**. Ver seção "Coverage Engine" abaixo.
 
-O titlis-scoreops **não acessa a API do Kubernetes**. Ele é acionado passivamente pelo
-operator-go via `POST /v1/scoring/evaluate`.
+O titlis-scoreops **não acessa a API do Kubernetes** nem o grafo (que vive em `titlis_oltp` na
+titlis-api). Ele é acionado passivamente via `POST /v1/scoring/evaluate` (por-workload) e
+`POST /v1/scoring/coverage/evaluate` (coverage por-serviço).
 
 ---
 
@@ -259,6 +263,48 @@ Para adicionar uma nova regra a um pillar existente:
 
 ---
 
+## Coverage Engine (Observability Intelligence Platform / D5)
+
+Pacote `internal/coverage/` — motor **independente** do scoring por-workload. Recebe um
+`CoverageSnapshot` flat por serviço (a titlis-api o monta do grafo; o scoreops **não vê o grafo**) e
+gera um **scorecard personalizado por natureza**. Determinístico, sem I/O, **sem IA**.
+
+```
+internal/coverage/
+├── snapshot.go   # CoverageSnapshot (Nature + Found + Capabilities)
+├── template.go   # ExpectationTemplate (COV-*) + DefaultTemplates + predicados AppliesWhen
+├── engine.go     # Engine.Evaluate → CoverageResult (Trust + Maturity)
+└── result.go     # CoverageResult, CoverageFinding, DimensionCoverage, maturityFromPct
+```
+
+### Divisor de águas: scorecard gerado por natureza
+
+A "matriz de cobertura" são **templates de expectativa com ID estável** (`COV-RESOURCES`, `COV-SLO`,
+`COV-TRACING`, `COV-JVM-METRICS`, ...) cada um com:
+- `AppliesWhen(Nature) bool` — selecionado pela natureza descoberta (language/httpFacing/criticality/...)
+- `RequiresCapability` — `monitor|tracing|metrics|logs`; ausente na snapshot → **N/A**, nunca "faltando"
+- `Signal(Found) bool` — pass/fail
+
+O engine emite, por serviço, só os templates aplicáveis → **dois serviços, dois scorecards diferentes**,
+mas com **IDs estáveis** (override/histórico/RAG/UI seguem funcionando). Generaliza a applicability
+implícita do `ObservabilityPillar` (OBS-002 pulado quando `!HasDatadog`).
+
+Três desfechos por template: **não aplicável** (não emitido), **N/A** (capacidade não mensurável),
+**pass/fail**. `TrustScore` = razão ponderada sobre os avaliáveis (não-N/A). `Maturity` (1–5) =
+elo mais fraco entre as dimensões (`maturityFromPct`).
+
+> Templates definidos **em código** na v1 (como os pilares). Tenant-custom/baseline-learned são
+> camadas futuras (tabela `coverage_expectation` prevista). Classificação de métrica hoje é feita no
+> operator (débito menor: idealmente no scoreops sobre nomes crus).
+
+### Endpoint
+
+`POST /v1/scoring/coverage/evaluate` (X-Internal-Secret) → recebe `CoverageSnapshot`, devolve
+`CoverageResult`. Registrado em `main.go` via `handler.NewCoverageEvaluateHandler(coverage.NewEngine(nil))`.
+Testes: `internal/coverage` (unit) + `internal/handler/coverage_evaluate_test.go` (e2e HTTP).
+
+---
+
 ## 11. O Que Não Fazer
 
 - **Nunca** acesse o Kubernetes API diretamente — o scoreops recebe snapshots passivamente
@@ -266,3 +312,6 @@ Para adicionar uma nova regra a um pillar existente:
 - **Nunca** omita `tenantID` em queries — isolamento multi-tenant é obrigatório
 - **Nunca** delete registros de `score_history` — é append-only por design
 - **Nunca** retorne `api_key` ou `github_token` em respostas JSON
+- **Nunca** gere findings de coverage via IA — são determinísticos por template; a IA só narra (titlis-ai)
+- **Nunca** acesse o grafo de ativos — o `CoverageSnapshot` chega pronto da titlis-api
+- **Nunca** marque um template dependente de fonte ausente como "faltando" — use N/A (`RequiresCapability`)

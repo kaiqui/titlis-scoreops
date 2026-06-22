@@ -15,6 +15,7 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/titlis/scoreops/internal/config"
+	"github.com/titlis/scoreops/internal/coverage"
 	"github.com/titlis/scoreops/internal/db"
 	"github.com/titlis/scoreops/internal/handler"
 	"github.com/titlis/scoreops/internal/middleware"
@@ -66,6 +67,9 @@ func main() {
 	engine.RegisterPillar(pillar.NewOperationalPillar())
 	engine.RegisterPillar(pillar.NewObservabilityPillar())
 
+	// coverage engine (D5): personalized scorecards from the discovered asset graph.
+	coverageEngine := coverage.NewEngine(nil)
+
 	// queue scoring engine
 	queueEngine := scoring.NewQueueScoreEngine()
 	queueEngine.RegisterPillar(pillar.NewQueueResiliencePillar())
@@ -114,6 +118,7 @@ func main() {
 	tagPolicyRepo := repository.NewTagPolicyRepo(pool)
 	tagPolicyH    := handler.NewTagPolicyHandler(tagPolicyRepo)
 	queueEvaluateH := handler.NewQueueEvaluateHandler(queueEngine, queueSnapshotRepo, queueScoreRepo, queueNotifier)
+	coverageEvaluateH := handler.NewCoverageEvaluateHandler(coverageEngine)
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID)
@@ -138,6 +143,7 @@ func main() {
 
 		// scoring
 		r.Post("/v1/scoring/evaluate", evaluateH.Evaluate)
+		r.Post("/v1/scoring/coverage/evaluate", coverageEvaluateH.Evaluate)
 		r.Post("/v1/queue/evaluate", queueEvaluateH.Evaluate)
 
 		// engines
